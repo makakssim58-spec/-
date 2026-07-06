@@ -177,12 +177,26 @@ async def status_command(message: types.Message):
 
 # --- Запуск бота ---
 async def main():
+    # Инициализация базы данных
     init_db()
     logging.info("Бот запущен...")
-    # Запускаем фоновую задачу
+    
+    # Запускаем фоновую проверку объявлений
     asyncio.create_task(check_new_ads())
-    # Запускаем обработку команд
-    await dp.start_polling(bot)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    # --- ЗАГЛУШКА ДЛЯ RENDER (чтобы бот не падал) ---
+    from aiohttp import web
+    
+    async def health_check(request):
+        return web.Response(text="OK")
+    
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 10000)
+    await site.start()
+    # ------------------------------------------------
+
+    # Запускаем бота
+    await dp.start_polling(bot)
