@@ -11,7 +11,7 @@ from aiogram.filters import Command
 from bs4 import BeautifulSoup
 
 # --- КОНФИГУРАЦИЯ (ВАШИ ДАННЫЕ) ---
-BOT_TOKEN = "8936461950:AAH3O4sMPXf46-b96Mwpf3-EvH0EwWkuXeo"
+BOT_TOKEN = "TELEGRAM_TOKEN"
 CHAT_ID = "5140709876"
 SEARCH_URL = "https://www.avito.ru/sankt-peterburg/mototsikly_i_mototehnika/mototsikly/used-ASgBAgICAkQ80k2Guw2qijQ?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6InkiO3M6MTY6ImtLWW5KNm82RXFKZDM5VmsiO30Vz4myJgAAAA&f=ASgBAQECAkQ80k2Guw2qijQBQISOD6TOm_EC0JvxAsqb8QLCm_ECyJvxAryb8QLGm_ECxJvxAr6b8QLAm_ECAUXGmgwWeyJmcm9tIjowLCJ0byI6MTAwMDAwfQ&localPriority=0&q=%D0%BC%D0%BE%D1%82%D0%BE%D1%86%D0%B8%D0%BA%D0%BB%D1%8B&radius=0&searchRadius=0"
 CHECK_INTERVAL = 300  # Проверка каждые 5 минут (300 секунд)
