@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sqlite3
 import os  # <--- Модуль os для работы с переменными окружения
+import time
 from dataclasses import dataclass
 from typing import List, Optional
 from aiohttp import web  # <--- Для веб-заглушки на Render
@@ -22,7 +23,7 @@ if not BOT_TOKEN:
 
 # Ваши остальные настройки
 CHAT_ID = "5140709876"
-SEARCH_URL = "https://www.avito.ru/sankt-peterburg/mototsikly_i_mototehnika/mototsikly/used-ASgBAgICAkQ80k2Guw2qijQ?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6InkiO3M6MTY6ImtLWW5KNm82RXFKZDM5VmsiO30Vz4myJgAAAA&f=ASgBAQECAkQ80k2Guw2qijQBQISOD6TOm_EC0JvxAsqb8QLCm_ECyJvxAryb8QLGm_ECxJvxAr6b8QLAm_ECAUXGmgwWeyJmcm9tIjowLCJ0byI6MTAwMDAwfQ&localPriority=0&q=%D0%BC%D0%BE%D1%82%D0%BE%D1%86%D0%B8%D0%BA%D0%BB%D1%8B&radius=0&searchRadius=0"
+SEARCH_URL = "https://www.avito.ru/sankt-peterburg/mototsikly_i_mototehnika/mototsikly/used-ASgBAgICAkQ80k2Guw2qijQ?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6InkiO3M6MTY6Ikd3ZktHajdJWnB4NU15bloiO33-VSdcJgAAAA&f=ASgBAQECAkQ80k2Guw2qijQBQISOD6TOm_EC0JvxAsqb8QLCm_ECyJvxAryb8QLGm_ECxJvxAr6b8QLAm_ECAUXGmgwWeyJmcm9tIjowLCJ0byI6MTAwMDAwfQ&localPriority=0&q=%D0%BC%D0%BE%D1%82%D0%BE%D1%86%D0%B8%D0%BA%D0%BB%D1%8B&radius=100&searchRadius=100"
 CHECK_INTERVAL = 300  # 5 минут
 
 # ==================================================
