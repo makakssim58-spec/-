@@ -126,7 +126,7 @@ def fetch_ads(search_url: str) -> List[Ad]:
     
     all_ads = []
     page = 1
-    max_pages = 10
+    max_pages = 3
     
     while page <= max_pages:
         if "?" in search_url:
