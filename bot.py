@@ -69,39 +69,70 @@ class Ad:
     image_url: Optional[str] = None
 
 def fetch_ads(search_url: str) -> List[Ad]:
+    """Парсит все страницы поиска и возвращает все объявления"""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-    try:
-        response = requests.get(search_url, headers=headers, timeout=10)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logging.error(f"Ошибка при запросе к Avito: {e}")
-        return []
-
-    soup = BeautifulSoup(response.text, "html.parser")
-    ad_items = soup.find_all("div", class_="iva-item-content")
-    ads = []
-
-    for item in ad_items:
+    
+    all_ads = []
+    page = 1
+    max_pages = 10  # Ограничиваем 10 страницами, чтобы не грузить Avito
+    
+    while page <= max_pages:
+        # Формируем URL с номером страницы
+        if "?" in search_url:
+            page_url = search_url + f"&p={page}"
+        else:
+            page_url = search_url + f"?p={page}"
+        
+        logging.info(f"Парсинг страницы {page}...")
+        
         try:
-            link_tag = item.find("a", class_="iva-item-title-link")
-            if not link_tag:
+            response = requests.get(page_url, headers=headers, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            logging.error(f"Ошибка при запросе страницы {page}: {e}")
+            break
+        
+        soup = BeautifulSoup(response.text, "html.parser")
+        ad_items = soup.find_all("div", class_="iva-item-content")
+        
+        # Если на странице нет объявлений — выходим
+        if not ad_items:
+            logging.info(f"Страница {page} пуста, завершаем парсинг")
+            break
+        
+        # Парсим объявления на странице
+        for item in ad_items:
+            try:
+                link_tag = item.find("a", class_="iva-item-title-link")
+                if not link_tag:
+                    continue
+                ad_url = "https://www.avito.ru" + link_tag.get("href")
+                ad_id = ad_url.split("_")[-1].split("?")[0]
+                title = link_tag.get_text(strip=True)
+                price_tag = item.find("span", class_="price-text")
+                price = price_tag.get_text(strip=True) if price_tag else "Цена не указана"
+                image_tag = item.find("img", class_="image-frame-image")
+                image_url = image_tag.get("src") if image_tag else None
+                if image_url and not image_url.startswith("http"):
+                    image_url = "https:" + image_url
+                all_ads.append(Ad(id=ad_id, title=title, price=price, url=ad_url, image_url=image_url))
+            except Exception as e:
+                logging.error(f"Ошибка при парсинге объявления на странице {page}: {e}")
                 continue
-            ad_url = "https://www.avito.ru" + link_tag.get("href")
-            ad_id = ad_url.split("_")[-1].split("?")[0]
-            title = link_tag.get_text(strip=True)
-            price_tag = item.find("span", class_="price-text")
-            price = price_tag.get_text(strip=True) if price_tag else "Цена не указана"
-            image_tag = item.find("img", class_="image-frame-image")
-            image_url = image_tag.get("src") if image_tag else None
-            if image_url and not image_url.startswith("http"):
-                image_url = "https:" + image_url
-            ads.append(Ad(id=ad_id, title=title, price=price, url=ad_url, image_url=image_url))
-        except Exception as e:
-            logging.error(f"Ошибка при парсинге: {e}")
-            continue
-    return ads
+        
+        # Если объявлений меньше 50 — это последняя страница
+        if len(ad_items) < 50:
+            logging.info(f"На странице {page} всего {len(ad_items)} объявлений, это последняя страница")
+            break
+        
+        page += 1
+        # Небольшая задержка между страницами, чтобы не заблокировали
+        time.sleep(1)
+    
+    logging.info(f"Всего найдено {len(all_ads)} объявлений на {page} страницах")
+    return all_ads
 
 # ==================================================
 # 5. ОТПРАВКА УВЕДОМЛЕНИЙ
