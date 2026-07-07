@@ -98,46 +98,56 @@ class Ad:
     image_url: Optional[str] = None
 
 def fetch_ads(search_url: str) -> List[Ad]:
-    """Парсит первую страницу с обновленными классами Avito"""
+    """Парсит страницу с максимальной маскировкой под браузер"""
+    
+    # Пауза перед запросом, чтобы не выглядеть как бот
+    time.sleep(3)
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0",
+        "sec-ch-ua": '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
     }
 
     try:
         session = requests.Session()
-        session.get("https://www.avito.ru", headers=headers, timeout=10)
-        response = session.get(search_url, headers=headers, timeout=15)
+        # Сначала заходим на главную страницу Avito
+        session.get("https://www.avito.ru", headers=headers, timeout=15)
+        # Делаем паузу
+        time.sleep(2)
+        # Теперь запрашиваем поиск
+        response = session.get(search_url, headers=headers, timeout=20)
         response.raise_for_status()
         
-        if "captcha" in response.text.lower():
+        # Проверяем наличие капчи
+        if "captcha" in response.text.lower() or "проверка" in response.text.lower():
             logging.warning("Avito вернул капчу!")
             return []
             
     except requests.RequestException as e:
-        logging.error(f"Ошибка при запросе: {e}")
+        logging.error(f"Ошибка: {e}")
         return []
 
     soup = BeautifulSoup(response.text, "html.parser")
     
-    # Ищем объявления по НОВЫМ классам (из вашего скриншота)
-    ad_items = []
-    
-    # 1. Основной способ: ищем по data-marker="item"
+    # Поиск объявлений
     ad_items = soup.find_all("div", {"data-marker": "item"})
-    
-    # 2. Если не нашло — ищем по классу iva-item-content-fRmzq
-    if not ad_items:
-        ad_items = soup.find_all("div", class_="iva-item-content-fRmzq")
-    
-    # 3. Если всё ещё пусто — ищем по старому классу (на всякий случай)
     if not ad_items:
         ad_items = soup.find_all("div", class_="iva-item-content")
     
     if not ad_items:
-        logging.warning("Не найдены объявления на странице. Avito мог изменить структуру.")
+        logging.warning("Не найдены объявления на странице")
         return []
 
     logging.info(f"Найдено {len(ad_items)} блоков объявлений")
@@ -145,12 +155,9 @@ def fetch_ads(search_url: str) -> List[Ad]:
     ads = []
     for item in ad_items:
         try:
-            # Ищем ссылку на объявление
             link_tag = item.find("a", {"data-marker": "item-title"})
             if not link_tag:
                 link_tag = item.find("a", class_="iva-item-title-link")
-            if not link_tag:
-                link_tag = item.find("a", href=True)
             if not link_tag:
                 continue
                 
@@ -161,15 +168,11 @@ def fetch_ads(search_url: str) -> List[Ad]:
             ad_id = ad_url.split("_")[-1].split("?")[0] if "_" in ad_url else str(hash(ad_url))
             title = link_tag.get_text(strip=True)
             
-            # Ищем цену
             price_tag = item.find("span", {"data-marker": "item-price"})
             if not price_tag:
                 price_tag = item.find("span", class_="price-text")
-            if not price_tag:
-                price_tag = item.find("span", class_="price-price")
             price = price_tag.get_text(strip=True) if price_tag else "Цена не указана"
             
-            # Ищем изображение
             image_tag = item.find("img", {"data-marker": "item-image"})
             if not image_tag:
                 image_tag = item.find("img", class_="image-frame-image")
@@ -177,16 +180,10 @@ def fetch_ads(search_url: str) -> List[Ad]:
             if image_url and not image_url.startswith("http"):
                 image_url = "https:" + image_url
 
-            ads.append(Ad(
-                id=ad_id,
-                title=title,
-                price=price,
-                url=ad_url,
-                image_url=image_url
-            ))
+            ads.append(Ad(id=ad_id, title=title, price=price, url=ad_url, image_url=image_url))
             
         except Exception as e:
-            logging.error(f"Ошибка при парсинге объявления: {e}")
+            logging.error(f"Ошибка при парсинге: {e}")
             continue
 
     logging.info(f"Успешно спарсено {len(ads)} объявлений")
