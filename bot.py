@@ -98,75 +98,59 @@ class Ad:
     image_url: Optional[str] = None
 
 def fetch_ads(search_url: str) -> List[Ad]:
-    """Парсит первую страницу с полной маскировкой под браузер"""
+    """Парсит первую страницу с обновленными классами Avito"""
     
-    # Максимально реалистичные заголовки, как у браузера Chrome
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0",
-        "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
-    }
-
-    # Добавляем куки, чтобы Avito думал, что мы уже заходили на сайт
-    cookies = {
-        "avito_guest_id": "1234567890",  # Можно сгенерировать случайное число
-        "ab_testing": "1",
     }
 
     try:
-        # Используем сессию, чтобы сохранять куки между запросами
         session = requests.Session()
-        # Сначала заходим на главную страницу Avito
         session.get("https://www.avito.ru", headers=headers, timeout=10)
-        
-        # Теперь запрашиваем наш поиск
-        response = session.get(search_url, headers=headers, cookies=cookies, timeout=15)
+        response = session.get(search_url, headers=headers, timeout=15)
         response.raise_for_status()
         
-        # Проверяем, не вернул ли Avito капчу или пустую страницу
-        if "captcha" in response.text.lower() or "проверка" in response.text:
-            logging.warning("Avito вернул капчу! Попробуйте позже.")
+        if "captcha" in response.text.lower():
+            logging.warning("Avito вернул капчу!")
             return []
             
-        if "ничего не найдено" in response.text or "объявлений нет" in response.text:
-            logging.info("Объявлений по вашему запросу не найдено.")
-            return []
-
     except requests.RequestException as e:
         logging.error(f"Ошибка при запросе: {e}")
         return []
 
-    # Парсим страницу
     soup = BeautifulSoup(response.text, "html.parser")
     
-    # Пробуем разные классы для поиска объявлений (Avito может их менять)
-    ad_items = soup.find_all("div", class_="iva-item-content")
+    # Ищем объявления по НОВЫМ классам (из вашего скриншота)
+    ad_items = []
+    
+    # 1. Основной способ: ищем по data-marker="item"
+    ad_items = soup.find_all("div", {"data-marker": "item"})
+    
+    # 2. Если не нашло — ищем по классу iva-item-content-fRmzq
     if not ad_items:
-        ad_items = soup.find_all("div", {"data-marker": "item"})
+        ad_items = soup.find_all("div", class_="iva-item-content-fRmzq")
+    
+    # 3. Если всё ещё пусто — ищем по старому классу (на всякий случай)
     if not ad_items:
-        ad_items = soup.find_all("div", class_="item")
+        ad_items = soup.find_all("div", class_="iva-item-content")
     
     if not ad_items:
-        logging.info("Не найдены объявления на странице. Возможно, Avito изменил верстку.")
+        logging.warning("Не найдены объявления на странице. Avito мог изменить структуру.")
         return []
 
+    logging.info(f"Найдено {len(ad_items)} блоков объявлений")
+    
     ads = []
     for item in ad_items:
         try:
-            link_tag = item.find("a", class_="iva-item-title-link")
+            # Ищем ссылку на объявление
+            link_tag = item.find("a", {"data-marker": "item-title"})
             if not link_tag:
-                link_tag = item.find("a", {"data-marker": "item-title"})
+                link_tag = item.find("a", class_="iva-item-title-link")
+            if not link_tag:
+                link_tag = item.find("a", href=True)
             if not link_tag:
                 continue
                 
@@ -175,27 +159,37 @@ def fetch_ads(search_url: str) -> List[Ad]:
                 ad_url = "https://www.avito.ru" + ad_url
                 
             ad_id = ad_url.split("_")[-1].split("?")[0] if "_" in ad_url else str(hash(ad_url))
-            title = link_tag.get_text(strip=True) if link_tag else "Без названия"
+            title = link_tag.get_text(strip=True)
             
-            price_tag = item.find("span", class_="price-text")
+            # Ищем цену
+            price_tag = item.find("span", {"data-marker": "item-price"})
             if not price_tag:
-                price_tag = item.find("span", {"data-marker": "item-price"})
+                price_tag = item.find("span", class_="price-text")
+            if not price_tag:
+                price_tag = item.find("span", class_="price-price")
             price = price_tag.get_text(strip=True) if price_tag else "Цена не указана"
             
-            image_tag = item.find("img", class_="image-frame-image")
+            # Ищем изображение
+            image_tag = item.find("img", {"data-marker": "item-image"})
             if not image_tag:
-                image_tag = item.find("img", {"data-marker": "item-image"})
+                image_tag = item.find("img", class_="image-frame-image")
             image_url = image_tag.get("src") if image_tag else None
             if image_url and not image_url.startswith("http"):
                 image_url = "https:" + image_url
 
-            ads.append(Ad(id=ad_id, title=title, price=price, url=ad_url, image_url=image_url))
+            ads.append(Ad(
+                id=ad_id,
+                title=title,
+                price=price,
+                url=ad_url,
+                image_url=image_url
+            ))
             
         except Exception as e:
             logging.error(f"Ошибка при парсинге объявления: {e}")
             continue
 
-    logging.info(f"Найдено {len(ads)} объявлений на первой странице")
+    logging.info(f"Успешно спарсено {len(ads)} объявлений")
     return ads
 
 # ==================================================
