@@ -24,7 +24,7 @@ if not BOT_TOKEN:
 CHAT_ID = "5140709876"
 
 # НОВАЯ ССЫЛКА С ФИЛЬТРОМ "СНАЧАЛА НОВЫЕ"
-SEARCH_URL = "https://www.avito.ru/sankt-peterburg/mototsikly_i_mototehnika/mototsikly/used-ASgBAgICAkQ80k2Guw2qijQ?f=ASgBAQECAkQ80k2Guw2qijQBQISOD6TOm_EC0JvxAsqb8QLCm_ECyJvxAryb8QLGm_ECxJvxAr6b8QLAm_ECAUXGmgwWeyJmcm9tIjowLCJ0byI6MTAwMDAwfQ&q=%D0%BC%D0%BE%D1%82%D0%BE%D1%86%D0%B8%D0%BA%D0%BB%D1%8B&radius=100&s=104"
+SEARCH_URL = "https://www.avito.ru/sankt-peterburg/mototsikly_i_mototehnika/mototsikly/used-ASgBAgICAkQ80k2Guw2qijQ?f=ASgBAQECAkQ80k2Guw2qijQBQISOD6TOm_EC0JvxAsqb8QLCm_ECyJvxAryb8QLGm_ECxJvxAr6b8QLAm_ECAUXGmgwWeyJmcm9tIjowLCJ0byI6MTAwMDAwfQ&q=%D0%BC%D0%BE%D1%82%D0%BE%D1%86%D0%B8%D0%BA%D0%BB%D1%8B&radius=100&s=104&searchRadius=100"
 
 # Интервал проверки (5 минут)
 CHECK_INTERVAL = 300
