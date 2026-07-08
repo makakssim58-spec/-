@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sqlite3
 import os
-import time  # <--- ЭТО НУЖНО ДОБАВИТЬ!!!
+import time
 from dataclasses import dataclass
 from typing import List, Optional
 from aiohttp import web
@@ -30,14 +30,30 @@ SEARCH_URL = "https://www.avito.ru/sankt-peterburg/mototsikly_i_mototehnika/moto
 CHECK_INTERVAL = 300
 
 # ==================================================
-# 2. НАСТРОЙКА БОТА
+# 2. НАСТРОЙКА ПРОКСИ (HAPP VPN)
+# ==================================================
+# ⚠️ ВСТАВЬТЕ ВАШИ ДАННЫЕ ИЗ HAPP:
+# - IP-адрес вашего компьютера (например, 192.168.1.100)
+# - Порт SOCKS5 (например, 10808)
+# ==================================================
+PROXY_IP = "192.168.1.100"  # <--- ЗАМЕНИТЕ НА ВАШ IP
+PROXY_PORT = "10808"        # <--- ЗАМЕНИТЕ НА ВАШ ПОРТ SOCKS5
+
+# Настройка прокси
+PROXIES = {
+    'http': f'socks5://{PROXY_IP}:{PROXY_PORT}',
+    'https': f'socks5://{PROXY_IP}:{PROXY_PORT}',
+}
+
+# ==================================================
+# 3. НАСТРОЙКА БОТА
 # ==================================================
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 # ==================================================
-# 3. КНОПКИ
+# 4. КНОПКИ
 # ==================================================
 def get_main_keyboard():
     keyboard = ReplyKeyboardMarkup(
@@ -63,7 +79,7 @@ def get_inline_keyboard():
     return keyboard
 
 # ==================================================
-# 4. БАЗА ДАННЫХ (ТОЛЬКО ДЛЯ ID ОБЪЯВЛЕНИЙ)
+# 5. БАЗА ДАННЫХ
 # ==================================================
 def init_db():
     conn = sqlite3.connect("avito_bot.db")
@@ -88,7 +104,7 @@ def mark_ad_as_sent(ad_id: str):
     conn.close()
 
 # ==================================================
-# 5. ПАРСИНГ (ТОЛЬКО ПЕРВАЯ СТРАНИЦА!)
+# 6. ПАРСИНГ (С ПРОКСИ)
 # ==================================================
 @dataclass
 class Ad:
@@ -99,9 +115,9 @@ class Ad:
     image_url: Optional[str] = None
 
 def fetch_ads(search_url: str) -> List[Ad]:
-    """Парсит страницу с максимальной маскировкой под браузер"""
+    """Парсит страницу с использованием прокси (HAPP VPN)"""
     
-    # Пауза перед запросом, чтобы не выглядеть как бот
+    # Пауза перед запросом
     time.sleep(3)
     
     headers = {
@@ -123,21 +139,26 @@ def fetch_ads(search_url: str) -> List[Ad]:
 
     try:
         session = requests.Session()
-        # Сначала заходим на главную страницу Avito
-        session.get("https://www.avito.ru", headers=headers, timeout=15)
+        
+        # Сначала заходим на главную страницу Avito через прокси
+        logging.info("Подключаюсь к Avito через прокси...")
+        session.get("https://www.avito.ru", headers=headers, timeout=15, proxies=PROXIES)
+        
         # Делаем паузу
         time.sleep(2)
-        # Теперь запрашиваем поиск
-        response = session.get(search_url, headers=headers, timeout=20)
+        
+        # Теперь запрашиваем поиск через прокси
+        response = session.get(search_url, headers=headers, timeout=20, proxies=PROXIES)
         response.raise_for_status()
         
         # Проверяем наличие капчи
         if "captcha" in response.text.lower() or "проверка" in response.text.lower():
-            logging.warning("Avito вернул капчу!")
+            logging.warning("Avito вернул капчу! Возможно, прокси не работает.")
             return []
             
     except requests.RequestException as e:
-        logging.error(f"Ошибка: {e}")
+        logging.error(f"Ошибка при запросе через прокси: {e}")
+        logging.error("Проверьте, что HAPP включён и прокси настроен правильно.")
         return []
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -184,14 +205,14 @@ def fetch_ads(search_url: str) -> List[Ad]:
             ads.append(Ad(id=ad_id, title=title, price=price, url=ad_url, image_url=image_url))
             
         except Exception as e:
-            logging.error(f"Ошибка при парсинге: {e}")
+            logging.error(f"Ошибка при парсинге объявления: {e}")
             continue
 
     logging.info(f"Успешно спарсено {len(ads)} объявлений")
     return ads
 
 # ==================================================
-# 6. ОТПРАВКА УВЕДОМЛЕНИЙ
+# 7. ОТПРАВКА УВЕДОМЛЕНИЙ
 # ==================================================
 async def send_ad_notification(ad: Ad):
     caption = f"<b>{ad.title}</b>\n💰 {ad.price}\n🔗 <a href='{ad.url}'>Ссылка на объявление</a>"
@@ -215,7 +236,7 @@ async def check_new_ads():
         await asyncio.sleep(CHECK_INTERVAL)
 
 # ==================================================
-# 7. ОБРАБОТЧИКИ КОМАНД И КНОПОК
+# 8. ОБРАБОТЧИКИ КОМАНД И КНОПОК
 # ==================================================
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
@@ -349,13 +370,13 @@ async def handle_inline_buttons(callback: types.CallbackQuery):
         await callback.answer()
 
 # ==================================================
-# 8. ЗАГЛУШКА ДЛЯ RENDER
+# 9. ЗАГЛУШКА ДЛЯ RENDER
 # ==================================================
 async def health_check(request):
     return web.Response(text="OK")
 
 # ==================================================
-# 9. ЗАПУСК
+# 10. ЗАПУСК
 # ==================================================
 async def main():
     init_db()
